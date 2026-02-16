@@ -446,11 +446,20 @@
 
     // --- Web Search ---
 
+    // Additional DOM references for search filters
+    const webSearchSiteFilter = $("#webSearchSiteFilter");
+    const webSearchFeedFilter = $("#webSearchFeedFilter");
+
+
+
     /**
      * Perform a web search for RSS feeds.
      */
     async function performWebSearch() {
         const query = webSearchInput.value.trim();
+        const siteFilter = webSearchSiteFilter.value.trim();
+        const feedFilter = webSearchFeedFilter.value.trim();
+
         if (!query) {
             showToast("Please enter a search query", "info");
             return;
@@ -463,7 +472,11 @@
         webSearchResults.querySelectorAll(".search-result-item").forEach((el) => el.remove());
 
         try {
-            const results = await api(`/api/search/web?q=${encodeURIComponent(query)}`);
+            const params = new URLSearchParams({ q: query });
+            if (siteFilter) params.append("site", siteFilter);
+            if (feedFilter) params.append("feed", feedFilter);
+
+            const results = await api(`/api/search/web?${params.toString()}`);
             webSearchLoading.style.display = "none";
 
             if (results.length === 0) {

@@ -34,7 +34,7 @@ COMMON_FEED_PATHS = [
 ]
 
 
-def search_feeds(query: str) -> list[dict]:
+def search_feeds(query: str, site_filter: str = "", feed_filter: str = "") -> list[dict]:
     """Search the web for RSS feeds matching a query.
 
     Combines results from DuckDuckGo search and direct URL probing.
@@ -42,6 +42,8 @@ def search_feeds(query: str) -> list[dict]:
 
     Parameters:
         query: Search query string.
+        site_filter: Optional filter string for site name/url.
+        feed_filter: Optional filter string for feed url.
 
     Returns:
         List of dicts with keys: site_url, feed_url, title, description.
@@ -73,7 +75,28 @@ def search_feeds(query: str) -> list[dict]:
             except Exception:
                 pass
 
-    return results[:20]
+    # Filter and clean results
+    final_results = []
+    for r in results:
+        # Must have a feed URL
+        if not r.get("feed_url"):
+            continue
+
+        # Apply site filter (case-insensitive)
+        if site_filter:
+            s_filter = site_filter.lower()
+            if s_filter not in r["title"].lower() and s_filter not in r["site_url"].lower():
+                continue
+
+        # Apply feed filter (case-insensitive)
+        if feed_filter:
+            f_filter = feed_filter.lower()
+            if f_filter not in r["feed_url"].lower():
+                continue
+
+        final_results.append(r)
+
+    return final_results[:20]
 
 
 def _process_direct_url(url: str) -> list[dict]:
@@ -273,210 +296,3 @@ def _search_duckduckgo(query: str) -> list[dict]:
     return results
 
 
-REQUEST_TIMEOUT = 5
-USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-
-# Common feed paths to probe on websites
-COMMON_FEED_PATHS = [
-    "/feed",
-    "/feed/",
-    "/rss",
-    "/rss/",
-    "/rss.xml",
-    "/feed.xml",
-    "/atom.xml",
-    "/feeds/posts/default",
-    "/index.xml",
-    "/blog/feed",
-    "/blog/rss",
-    "/?feed=rss2",
-]
-
-
-def search_feeds(query: str) -> list[dict]:
-    """Search the web for RSS feeds matching a query.
-
-    Combines results from DuckDuckGo search and direct URL probing.
-    Each result includes site_url (website) and feed_url (RSS feed).
-
-    Parameters:
-        query: Search query string.
-
-    Returns:
-        List of dicts with keys: site_url, feed_url, title, description.
-    """
-    results: list[dict] = []
-    seen_sites: set[str] = set()
-
-    # Strategy 1: If query looks like a URL, try direct discovery
-    if _looks_like_url(query):
-        url = query if query.startswith("http") else f"https://{query}"
-        direct_results = _discover_feeds_from_url(url)
-        for r in direct_results:
-            if r["url"] not in seen_sites:
-                seen_sites.add(r["url"])
-                results.append({
-                    "site_url": url,
-                    "feed_url": r["url"],
-                    "title": r["title"],
-                    "description": r["description"],
-                })
-
-    # Strategy 2: Search DuckDuckGo
-    search_results = _search_duckduckgo(query)
-    for r in search_results:
-        site_url = r["url"]
-        if site_url in seen_sites:
-            continue
-        seen_sites.add(site_url)
-
-        # Probe website for actual RSS feed URL
-        feeds = _discover_feeds_from_url(site_url)
-        feed_url = feeds[0]["url"] if feeds else None
-        feed_desc = r["description"] or (feeds[0]["description"] if feeds else "")
-
-        results.append({
-            "site_url": site_url,
-            "feed_url": feed_url,
-            "title": r["title"],
-            "description": feed_desc,
-        })
-
-    return results[:20]
-
-
-def _looks_like_url(text: str) -> bool:
-    """Check if text looks like a URL or domain name.
-
-    Parameters:
-        text: Text to check.
-
-    Returns:
-        True if text resembles a URL.
-    """
-    return "." in text and " " not in text.strip()
-
-
-def _discover_feeds_from_url(url: str) -> list[dict]:
-    # ... (docstring)
-    results = []
-
-    # Try to find feed links in HTML
-    try:
-        resp = requests.get(url, timeout=REQUEST_TIMEOUT, headers={"User-Agent": USER_AGENT})
-        if resp.status_code == 200:
-            content_type = resp.headers.get("content-type", "")
-
-            # Check if the URL itself is a feed
-            if "xml" in content_type or "rss" in content_type or "atom" in content_type:
-                feed = feedparser.parse(resp.content)
-                if feed.entries:
-                    title = getattr(feed.feed, "title", url)
-                    results.append({
-                        "url": url,
-                        "title": title,
-                        "description": getattr(feed.feed, "subtitle", "") or getattr(feed.feed, "description", ""),
-                    })
-                    return results
-
-            # Parse HTML for <link> feed references
-            soup = BeautifulSoup(resp.text, "lxml")
-            feed_links = soup.find_all(
-                "link",
-                type=lambda t: t and ("rss" in t or "atom" in t or "xml" in t),
-            )
-            for link in feed_links:
-                href = link.get("href", "")
-                if href:
-                    feed_url = urljoin(url, href)
-                    title = link.get("title", "") or feed_url
-                    results.append({"url": feed_url, "title": title, "description": ""})
-
-    except Exception:
-        pass
-
-    # Try common feed paths
-    parsed = urlparse(url)
-    base_url = f"{parsed.scheme}://{parsed.netloc}"
-    for path in COMMON_FEED_PATHS:
-        feed_url = base_url + path
-        if feed_url in {r["url"] for r in results}:
-            continue
-        try:
-            resp = requests.get(
-                feed_url,
-                timeout=5,
-                headers={"User-Agent": USER_AGENT},
-                allow_redirects=True,
-            )
-            if resp.status_code == 200:
-                ct = resp.headers.get("content-type", "")
-                if "xml" in ct or "rss" in ct or "atom" in ct:
-                    feed = feedparser.parse(resp.content)
-                    if feed.entries:
-                        title = getattr(feed.feed, "title", feed_url)
-                        results.append({
-                            "url": feed_url,
-                            "title": title,
-                            "description": getattr(feed.feed, "subtitle", "") or "",
-                        })
-        except requests.RequestException:
-            continue
-
-    return results
-
-
-def _search_duckduckgo(query: str) -> list[dict]:
-    """Search DuckDuckGo for RSS feed URLs.
-
-    Parameters:
-        query: Search query.
-
-    Returns:
-        List of dicts with url, title, description.
-    """
-    results = []
-    search_query = f"{query} RSS feed"
-    search_url = f"https://html.duckduckgo.com/html/?q={quote_plus(search_query)}"
-
-    try:
-        resp = requests.get(
-            search_url,
-            timeout=REQUEST_TIMEOUT,
-            headers={"User-Agent": USER_AGENT},
-        )
-        if resp.status_code != 200:
-            return results
-
-        soup = BeautifulSoup(resp.text, "lxml")
-        result_items = soup.select(".result")
-
-        for item in result_items[:10]:
-            link = item.select_one(".result__a")
-            if not link:
-                continue
-
-            href = link.get("href", "")
-            title = link.get_text(strip=True)
-
-            # Extract snippet description
-            snippet_el = item.select_one(".result__snippet")
-            description = snippet_el.get_text(strip=True) if snippet_el else ""
-
-            # DuckDuckGo wraps URLs in redirects
-            if "uddg=" in href:
-                from urllib.parse import parse_qs
-                params = parse_qs(urlparse(href).query)
-                href = params.get("uddg", [href])[0]
-
-            if href and href.startswith("http"):
-                results.append({
-                    "url": href,
-                    "title": title,
-                    "description": description,
-                })
-
-    except Exception:
-        pass
-
-    return results

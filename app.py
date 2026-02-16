@@ -178,10 +178,13 @@ def search_web():
         JSON list of search result objects.
     """
     query = request.args.get("q", "").strip()
+    site_filter = request.args.get("site", "").strip()
+    feed_filter = request.args.get("feed", "").strip()
+
     if not query:
         return jsonify({"error": "Search query is required"}), 400
 
-    results = search_feeds(query)
+    results = search_feeds(query, site_filter=site_filter, feed_filter=feed_filter)
     return jsonify(results)
 
 
