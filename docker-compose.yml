@@ -2,7 +2,7 @@ services:
   feedflow:
     build: .
     ports:
-      - "5050:5050"
+      - "${FLASK_PORT:-5050}:5050"
     volumes:
       - feed_data:/app/data
     env_file:
