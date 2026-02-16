@@ -509,11 +509,7 @@
     }
 
     /**
-     * Render article cards in the main content area.
-     * @param {Array} articles - Array of article objects.
-     */
-    /**
-     * Toggle a card between short and full description.
+     * Toggle a card between short and full description (tile view only).
      * @param {HTMLElement} card - The article card element.
      */
     function toggleViewMode(card) {
@@ -522,6 +518,10 @@
         card.classList.add(isShort ? "view-full" : "view-short");
     }
 
+    /**
+     * Render article cards in the main content area.
+     * @param {Array} articles - Array of article objects.
+     */
     function renderArticles(articles) {
         // Clear
         articlesContainer.innerHTML = "";
@@ -558,9 +558,18 @@
                         <span>${escapeHtml(article.feed_title || "")}</span>
                     </div>
                     <time class="article-card-date" datetime="${escapeHtml(article.pub_date)}">${dateStr}</time>
+                    ${article.link ? `<a class="article-card-link header-link" href="${escapeHtml(article.link)}" target="_blank" rel="noopener noreferrer">
+                        Read article
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                            <polyline points="15 3 21 3 21 9"></polyline>
+                            <line x1="10" y1="14" x2="21" y2="3"></line>
+                        </svg>
+                    </a>` : ""}
                 </div>
                 <div class="article-content-wrapper">
                     <h3 class="article-card-title">
+                        ${article.feed_image ? `<img src="${escapeHtml(article.feed_image)}" class="article-title-icon" alt="" onerror="this.style.display='none'">` : ""}
                         <span>${escapeHtml(article.title)}</span>
                     </h3>
                     ${fullDescription ? `<p class="article-card-description">${escapeHtml(fullDescription)}</p>` : ""}
@@ -570,7 +579,7 @@
                         ${article.category ? `<span class="article-tag">${escapeHtml(article.category)}</span>` : ""}
                         ${article.author ? `<span class="article-author">by ${escapeHtml(article.author)}</span>` : ""}
                     </div>
-                    ${article.link ? `<a class="article-card-link" href="${escapeHtml(article.link)}" target="_blank" rel="noopener noreferrer">
+                    ${article.link ? `<a class="article-card-link footer-link" href="${escapeHtml(article.link)}" target="_blank" rel="noopener noreferrer">
                         Read article
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
@@ -582,10 +591,14 @@
                 <div class="article-card-view-hint">Click to expand</div>
             `;
 
-            // Click card to toggle short/full (except when clicking the external link)
+            // Click card to toggle view in both layouts
             card.addEventListener("click", (e) => {
                 if (e.target.closest(".article-card-link")) return;
-                toggleViewMode(card);
+                if (currentLayout === "list") {
+                    card.classList.toggle("list-expanded");
+                } else {
+                    toggleViewMode(card);
+                }
             });
 
             fragment.appendChild(card);

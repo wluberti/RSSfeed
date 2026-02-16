@@ -778,80 +778,118 @@ a:hover {
 /* List layout */
 .articles-container.layout-list {
     grid-template-columns: 1fr;
-    gap: var(--space-1);
-    padding: var(--space-3);
+    grid-auto-rows: auto;
+    gap: 0;
+    padding: var(--space-2) var(--space-3);
 }
 
 .articles-container.layout-list .article-card {
-    flex-direction: row;
-    align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-sm);
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-1);
+    padding: var(--space-3);
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    border-bottom: 1px solid var(--color-border-light);
+    box-shadow: none;
 }
 
 .articles-container.layout-list .article-card:hover {
     transform: none;
+    box-shadow: none;
 }
 
+/* Header: date + read-article link in a right-aligned row */
 .articles-container.layout-list .article-card-header {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-3);
     margin-bottom: 0;
 }
 
-.articles-container.layout-list .article-card-feed span,
-.articles-container.layout-list .article-card-feed-dot,
-.articles-container.layout-list .article-card-date {
+/* Hide feed info from header (icon moves to title row) */
+.articles-container.layout-list .article-card-feed {
     display: none;
 }
 
-.articles-container.layout-list .article-content-wrapper {
-    flex: 1;
-    min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-size: var(--font-size-sm);
-    line-height: normal;
-}
-
-.articles-container.layout-list .article-card-title {
-    display: inline;
-    font-size: inherit;
-    font-weight: 500;
-    margin: 0;
-}
-
-.articles-container.layout-list .article-card-title::after {
-    content: " - ";
+.articles-container.layout-list .article-card-date {
+    font-size: var(--font-size-xs);
     color: var(--color-text-tertiary);
-    font-weight: normal;
+    flex-shrink: 0;
 }
 
-.articles-container.layout-list .article-card-description {
-    display: inline;
-    font-size: inherit;
-    color: var(--color-text-secondary);
+/* Show the read-article link in the header (pulled from footer) */
+.articles-container.layout-list .article-card-header .article-card-link {
+    display: inline-flex;
+}
+
+/* Content: title always visible, description clamped or full */
+.articles-container.layout-list .article-content-wrapper {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+/* Title row: icon + title side by side */
+.articles-container.layout-list .article-card-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--font-size-md);
+    font-weight: 600;
     margin: 0;
+    line-height: 1.4;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+/* Show feed icon before title text */
+.articles-container.layout-list .article-card-title .article-title-icon {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+/* Description: collapsed = 2 lines (higher specificity to override view-short) */
+.articles-container.layout-list .article-card.view-short .article-card-description,
+.articles-container.layout-list .article-card .article-card-description {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    margin: var(--space-1) 0 0 0;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+/* Expanded: show all description text */
+.articles-container.layout-list .article-card.list-expanded .article-card-description {
+    display: block;
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+    overflow: visible;
 }
 
 .articles-container.layout-list .article-card-view-hint {
     display: none;
 }
 
+/* Hide footer in list view (link moved to header) */
 .articles-container.layout-list .article-card-footer {
-    margin-top: 0;
-    flex-shrink: 0;
-}
-
-.articles-container.layout-list .article-card-meta {
     display: none;
-}
-
-.articles-container.layout-list .article-card-link {
-    font-size: var(--font-size-xs);
-    padding: 2px var(--space-2);
 }
 
 .articles-empty {
@@ -1019,6 +1057,15 @@ a:hover {
     transition: all var(--transition-fast);
     flex-shrink: 0;
     white-space: nowrap;
+}
+
+/* Hide header-link and title-icon by default (tile view) */
+.article-card-link.header-link {
+    display: none;
+}
+
+.article-title-icon {
+    display: none;
 }
 
 .article-card-link:hover {
