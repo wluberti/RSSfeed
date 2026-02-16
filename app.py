@@ -160,8 +160,11 @@ def get_articles():
     sort = request.args.get("sort", "date")
     order = request.args.get("order", "desc")
     query = request.args.get("q")
+    group = request.args.get("group")
 
-    articles = db.get_articles(feed_id=feed_id, sort=sort, order=order, query=query)
+    articles = db.get_articles(
+        feed_id=feed_id, sort=sort, order=order, query=query, group=group
+    )
     return jsonify(articles)
 
 
@@ -186,6 +189,90 @@ def search_web():
 
     results = search_feeds(query, site_filter=site_filter, feed_filter=feed_filter)
     return jsonify(results)
+
+
+@app.route("/api/feeds/import", methods=["POST"])
+def import_feeds():
+    """Import feeds from OPML or CSV.
+
+    Currently supports Google Takeout YouTube subscription CSVs.
+    Columns expected: 'Channel ID', 'Channel URL', 'Channel title'
+
+    Returns:
+        JSON with import summary (count, errors).
+    """
+    if "file" not in request.files:
+        return jsonify({"error": "No file part"}), 400
+
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "No selected file"}), 400
+
+    if not file.filename.endswith(".csv"):
+        return jsonify({"error": "Only .csv files are supported currently"}), 400
+
+    import csv
+    import io
+
+    try:
+        stream = io.StringIO(file.stream.read().decode("utf-8"), newline=None)
+        reader = csv.DictReader(stream)
+
+        # Verify headers for YouTube Takeout CSV
+        if not set(["Channel ID", "Channel Title"]).issubset(reader.fieldnames or []):
+             # Try stricter check or fallback
+             pass
+
+        success_count = 0
+        errors = []
+
+        for row in reader:
+            channel_id = row.get("Channel ID")
+            title = row.get("Channel Title") or row.get("Channel title")
+
+            if not channel_id:
+                continue
+
+            # Construct YouTube RSS URL
+            feed_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+
+            # Add to database (simulating a fetch to get metadata isn't strictly necessary if we trust the construction,
+            # but we need to fetch to get the proper image/description if we want it nice.
+            # However, for bulk import, let's just add it and let the first refresh populate details?
+            # OR better: use the existing fetch_feed to verify and get metadata.)
+
+            # To speed up, we can try to add directly if we are sure, but fetch_feed ensures valid RSS.
+            # Let's use fetch_feed for correctness, even if slower.
+
+            result = fetch_feed(feed_url)
+            if not result:
+                errors.append(f"Failed to fetch feed for {title or channel_id}")
+                continue
+
+            meta = result["meta"]
+            try:
+                feed = db.add_feed(
+                    url=feed_url,
+                    title=meta.get("title", title or ""),
+                    description=meta.get("description", ""),
+                    site_url=meta.get("site_url", f"https://www.youtube.com/channel/{channel_id}"),
+                    image_url=meta.get("image_url", ""),
+                )
+                # Store articles too? Yes, for immediate content.
+                db.upsert_articles(feed["id"], result["articles"])
+                success_count += 1
+            except Exception as e:
+                if "UNIQUE constraint" not in str(e):
+                    errors.append(f"Error adding {title}: {str(e)}")
+
+        return jsonify({
+            "success": True,
+            "count": success_count,
+            "errors": errors
+        })
+
+    except Exception as e:
+        return jsonify({"error": f"Import failed: {str(e)}"}), 500
 
 
 if __name__ == "__main__":

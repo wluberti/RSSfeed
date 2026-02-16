@@ -155,6 +155,10 @@
 
     // --- Feed List ---
 
+    let isYoutubeCollapsed = true;
+    let isYoutubeListExpanded = false;
+    const YOUTUBE_LIMIT = 15;
+
     /**
      * Load and render all feeds from the API.
      */
@@ -168,45 +172,147 @@
     }
 
     /**
+     * Helper to create a feed item DOM element
+     */
+    function createFeedItem(feed) {
+        const item = document.createElement("div");
+        item.className = `feed-item${currentFeedId === feed.id ? " active" : ""}`;
+        item.dataset.feedId = feed.id;
+
+        const iconHtml = feed.image_url
+            ? `<img class="feed-item-icon" src="${escapeHtml(feed.image_url)}" alt="" onerror="this.outerHTML='<div class=\\'feed-item-icon-placeholder\\'>${escapeHtml(feed.title.charAt(0).toUpperCase())}</div>'">`
+            : `<div class="feed-item-icon-placeholder">${escapeHtml(feed.title.charAt(0).toUpperCase())}</div>`;
+
+        item.innerHTML = `
+            ${iconHtml}
+            <div class="feed-item-info">
+                <div class="feed-item-title" title="${escapeHtml(feed.title)}">${escapeHtml(feed.title)}</div>
+                <div class="feed-item-count">${feed.article_count || 0} articles</div>
+            </div>
+            <div class="feed-item-actions">
+                <button class="btn btn-icon refresh-feed-btn" title="Refresh">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <polyline points="1 20 1 14 7 14"></polyline>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                </button>
+                <button class="btn btn-icon remove-feed-btn" title="Remove feed" style="color: var(--color-danger);">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                </button>
+            </div>
+        `;
+
+        // Click to filter by this feed
+        item.addEventListener("click", (e) => {
+            if (e.target.closest(".feed-item-actions")) return;
+            currentFeedId = feed.id;
+            // Re-render to update active state, but keep collapse state
+            renderFeedList();
+            loadArticles();
+            updateFilterButtons();
+        });
+
+        // Refresh single feed
+        item.querySelector(".refresh-feed-btn").addEventListener("click", async (e) => {
+            e.stopPropagation(); // Prevent item click
+            const btn = e.target.closest(".refresh-feed-btn");
+            btn.innerHTML = '<div class="spinner" style="width:12px;height:12px;border-width:2px"></div>';
+            try {
+                await api(`/api/feeds/${feed.id}/refresh`, { method: "POST" });
+                showToast(`Refreshed "${feed.title}"`, "success");
+                await loadFeeds();
+                await loadArticles();
+            } catch (err) {
+                showToast("Refresh failed: " + err.message, "error");
+                btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>';
+            }
+        });
+
+        // Remove feed
+        item.querySelector(".remove-feed-btn").addEventListener("click", async (e) => {
+            e.stopPropagation(); // Prevent item click
+            const confirmed = await showConfirm(
+                "Remove Feed",
+                `Remove "${feed.title}" and all its articles?`
+            );
+            if (!confirmed) return;
+            try {
+                await api(`/api/feeds/${feed.id}`, { method: "DELETE" });
+                showToast(`Removed "${feed.title}"`, "success");
+                if (currentFeedId === feed.id) {
+                    currentFeedId = null;
+                    updateFilterButtons();
+                }
+                await loadFeeds();
+                await loadArticles();
+            } catch (err) {
+                showToast("Remove failed: " + err.message, "error");
+            }
+        });
+
+        return item;
+    }
+
+    /**
      * Render the feed list in the sidebar.
      */
     function renderFeedList() {
         // Keep empty state visibility in sync
         if (feeds.length === 0) {
             feedListEmpty.style.display = "flex";
-            // Clear any feed items
-            feedList.querySelectorAll(".feed-item").forEach((el) => el.remove());
+            feedList.innerHTML = "";
+            feedList.appendChild(feedListEmpty);
             return;
         }
         feedListEmpty.style.display = "none";
 
-        // Build feed items
+        // Separate YouTube feeds
+        const youtubeFeeds = feeds.filter(f =>
+            (f.url && f.url.includes("youtube.com")) ||
+            (f.site_url && f.site_url.includes("youtube.com"))
+        );
+        const otherFeeds = feeds.filter(f => !youtubeFeeds.includes(f));
+
         const fragment = document.createDocumentFragment();
-        feeds.forEach((feed) => {
-            const item = document.createElement("div");
-            item.className = `feed-item${currentFeedId === feed.id ? " active" : ""}`;
-            item.dataset.feedId = feed.id;
 
-            const iconHtml = feed.image_url
-                ? `<img class="feed-item-icon" src="${escapeHtml(feed.image_url)}" alt="" onerror="this.outerHTML='<div class=\\'feed-item-icon-placeholder\\'>${escapeHtml(feed.title.charAt(0).toUpperCase())}</div>'">`
-                : `<div class="feed-item-icon-placeholder">${escapeHtml(feed.title.charAt(0).toUpperCase())}</div>`;
+        // 1. Render standard feeds
+        otherFeeds.forEach((feed) => {
+            fragment.appendChild(createFeedItem(feed));
+        });
 
-            item.innerHTML = `
-                ${iconHtml}
-                <div class="feed-item-info">
-                    <div class="feed-item-title" title="${escapeHtml(feed.title)}">${escapeHtml(feed.title)}</div>
-                    <div class="feed-item-count">${feed.article_count || 0} articles</div>
-                </div>
-                <div class="feed-item-actions">
-                    <button class="btn btn-icon refresh-feed-btn" title="Refresh">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        // 2. Render grouped YouTube feeds if any
+        if (youtubeFeeds.length > 0) {
+            const groupHeader = document.createElement("div");
+            groupHeader.className = `feed-group-header${currentFeedId === 'youtube-all' ? ' active' : ''}`;
+            groupHeader.style.cssText = "display:flex;align-items:center;padding:8px 12px;cursor:pointer;font-weight:600;font-size:0.9rem;color:var(--text-secondary);user-select:none;margin-top:8px;";
+            // Highlight if active
+            if (currentFeedId === 'youtube-all') {
+                groupHeader.style.backgroundColor = "var(--bg-hover)";
+                groupHeader.style.color = "var(--color-primary)";
+            }
+
+            const arrowTransform = isYoutubeCollapsed ? "0deg" : "90deg";
+
+            groupHeader.innerHTML = `
+                <svg class="group-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="margin-right:8px;transition:transform 0.2s;transform:rotate(${arrowTransform})">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+                <span class="group-title-text" title="Show all YouTube subscriptions">YouTube Subscriptions</span>
+                <span style="margin-left:auto;font-size:0.8rem;opacity:0.7;margin-right:8px;">${youtubeFeeds.length}</span>
+                <div class="feed-item-actions" style="display:flex;gap:2px;">
+                    <button class="btn btn-icon yt-refresh-all-btn" title="Refresh all subscriptions" style="width:28px;height:28px;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <polyline points="23 4 23 10 17 10"></polyline>
                             <polyline points="1 20 1 14 7 14"></polyline>
                             <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
                         </svg>
                     </button>
-                    <button class="btn btn-icon remove-feed-btn" title="Remove feed" style="color: var(--color-danger);">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <button class="btn btn-icon yt-remove-all-btn" title="Remove all subscriptions" style="color:var(--color-danger);width:28px;height:28px;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <polyline points="3 6 5 6 21 6"></polyline>
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                         </svg>
@@ -214,53 +320,137 @@
                 </div>
             `;
 
-            // Click to filter by this feed
-            item.addEventListener("click", (e) => {
-                if (e.target.closest(".feed-item-actions")) return;
-                currentFeedId = feed.id;
+            const groupContainer = document.createElement("div");
+            groupContainer.className = "feed-group-container";
+            groupContainer.style.display = isYoutubeCollapsed ? "none" : "block";
+            groupContainer.style.paddingLeft = "0";
+
+            // List Truncation Logic
+            const visibleFeeds = isYoutubeListExpanded ? youtubeFeeds : youtubeFeeds.slice(0, YOUTUBE_LIMIT);
+
+            visibleFeeds.forEach((feed) => {
+                const item = createFeedItem(feed);
+                groupContainer.appendChild(item);
+            });
+
+            // Header Click -> Toggle Collapse (Arrow) / Filter All (Text)
+            const arrowBtn = groupHeader.querySelector(".group-arrow");
+            const titleText = groupHeader.querySelector(".group-title-text");
+
+            // Toggle collapse
+            const toggleCollapse = (e) => {
+                e.stopPropagation();
+                isYoutubeCollapsed = !isYoutubeCollapsed;
+                renderFeedList(); // Re-render to update UI
+            };
+            arrowBtn.addEventListener("click", toggleCollapse);
+
+            // Filter all YouTube feeds
+            titleText.addEventListener("click", (e) => {
+                e.stopPropagation();
+                currentFeedId = 'youtube-all';
                 renderFeedList();
                 loadArticles();
                 updateFilterButtons();
             });
 
-            // Refresh single feed
-            item.querySelector(".refresh-feed-btn").addEventListener("click", async () => {
-                try {
-                    await api(`/api/feeds/${feed.id}/refresh`, { method: "POST" });
-                    showToast(`Refreshed "${feed.title}"`, "success");
-                    await loadFeeds();
-                    await loadArticles();
-                } catch (err) {
-                    showToast("Refresh failed: " + err.message, "error");
-                }
+            groupHeader.addEventListener("click", (e) => {
+                // If clicked arrow, title, or action buttons, handled separately.
+                if (e.target.closest(".group-arrow") || e.target.closest(".group-title-text") || e.target.closest(".feed-item-actions")) return;
+
+                currentFeedId = 'youtube-all';
+                if (isYoutubeCollapsed) isYoutubeCollapsed = false; // Auto-expand
+                renderFeedList();
+                loadArticles();
+                updateFilterButtons();
             });
 
-            // Remove feed
-            item.querySelector(".remove-feed-btn").addEventListener("click", async () => {
+            // Refresh All YouTube Subscriptions
+            groupHeader.querySelector(".yt-refresh-all-btn").addEventListener("click", async (e) => {
+                e.stopPropagation();
+                const btn = e.target.closest(".yt-refresh-all-btn");
+                btn.innerHTML = '<div class="spinner" style="width:12px;height:12px;border-width:2px"></div>';
+                showToast(`Refreshing ${youtubeFeeds.length} subscriptions...`, "info");
+                let successCount = 0;
+                let failCount = 0;
+                for (const feed of youtubeFeeds) {
+                    try {
+                        await api(`/api/feeds/${feed.id}/refresh`, { method: "POST" });
+                        successCount++;
+                    } catch {
+                        failCount++;
+                    }
+                }
+                showToast(`Refreshed ${successCount}/${youtubeFeeds.length} subscriptions${failCount ? ` (${failCount} failed)` : ''}`, successCount > 0 ? "success" : "error");
+                await loadFeeds();
+                await loadArticles();
+            });
+
+            // Remove All YouTube Subscriptions
+            groupHeader.querySelector(".yt-remove-all-btn").addEventListener("click", async (e) => {
+                e.stopPropagation();
                 const confirmed = await showConfirm(
-                    "Remove Feed",
-                    `Remove "${feed.title}" and all its articles?`
+                    "Remove All Subscriptions",
+                    `Remove all ${youtubeFeeds.length} YouTube subscriptions and their articles?`
                 );
                 if (!confirmed) return;
-                try {
-                    await api(`/api/feeds/${feed.id}`, { method: "DELETE" });
-                    showToast(`Removed "${feed.title}"`, "success");
-                    if (currentFeedId === feed.id) {
-                        currentFeedId = null;
-                        updateFilterButtons();
-                    }
-                    await loadFeeds();
-                    await loadArticles();
-                } catch (err) {
-                    showToast("Remove failed: " + err.message, "error");
+                showToast(`Removing ${youtubeFeeds.length} subscriptions...`, "info");
+                let successCount = 0;
+                for (const feed of youtubeFeeds) {
+                    try {
+                        await api(`/api/feeds/${feed.id}`, { method: "DELETE" });
+                        successCount++;
+                    } catch { /* skip */ }
                 }
+                if (currentFeedId === 'youtube-all') {
+                    currentFeedId = null;
+                    updateFilterButtons();
+                }
+                showToast(`Removed ${successCount} subscriptions`, "success");
+                await loadFeeds();
+                await loadArticles();
             });
 
-            fragment.appendChild(item);
-        });
+            // "Show more..." / "Show less" toggle
+            if (youtubeFeeds.length > YOUTUBE_LIMIT) {
+                const toggleItem = document.createElement("div");
+                toggleItem.style.padding = "8px 12px";
+                toggleItem.style.fontSize = "0.8rem";
+                toggleItem.style.color = "var(--text-tertiary)";
+                toggleItem.style.fontStyle = "italic";
+                toggleItem.style.cursor = "pointer";
+                toggleItem.className = "youtube-toggle-more"; // For potential styling
 
-        // Replace existing feed items
-        feedList.querySelectorAll(".feed-item").forEach((el) => el.remove());
+                if (!isYoutubeListExpanded) {
+                    toggleItem.textContent = `...show ${youtubeFeeds.length - YOUTUBE_LIMIT} more`;
+                    toggleItem.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        isYoutubeListExpanded = true;
+                        renderFeedList();
+                    });
+                     groupContainer.appendChild(toggleItem);
+                } else {
+                    // Start of list is already rendered above
+                    // Make "Show less" appear at the END of the list
+                    toggleItem.textContent = "Show less";
+                    toggleItem.style.textAlign = "center";
+                    toggleItem.addEventListener("click", (e) => {
+                         e.stopPropagation();
+                         isYoutubeListExpanded = false;
+                         renderFeedList();
+                         // Scroll back to top of group? Optional.
+                    });
+                    groupContainer.appendChild(toggleItem);
+                }
+            }
+
+            fragment.appendChild(groupHeader);
+            fragment.appendChild(groupContainer);
+        }
+
+        // Replace existing feed items (keep empty placeholder ref)
+        feedList.innerHTML = "";
+        feedList.appendChild(feedListEmpty);
         feedList.appendChild(fragment);
     }
 
@@ -272,6 +462,19 @@
         feedList.querySelectorAll(".feed-item").forEach((el) => {
             el.classList.toggle("active", parseInt(el.dataset.feedId) === currentFeedId);
         });
+        // Handle YouTube group header active state
+        const groupHeader = feedList.querySelector(".feed-group-header");
+        if (groupHeader) {
+            if (currentFeedId === 'youtube-all') {
+                groupHeader.classList.add("active");
+                groupHeader.style.backgroundColor = "var(--bg-hover)";
+                groupHeader.style.color = "var(--color-primary)";
+            } else {
+                groupHeader.classList.remove("active");
+                groupHeader.style.backgroundColor = ""; // Reset
+                groupHeader.style.color = "var(--text-secondary)";
+            }
+        }
     }
 
     // --- Articles ---
@@ -290,6 +493,9 @@
             if (query) {
                 // Search always across all feeds
                 params.set("q", query);
+            } else if (currentFeedId === 'youtube-all') {
+                 // Filter by YouTube group
+                 params.set("group", "youtube");
             } else if (currentFeedId !== null) {
                 // Only filter by feed when not searching
                 params.set("feed_id", currentFeedId);
@@ -712,11 +918,92 @@
         });
     }
 
+    // --- Import Feeds ---
+
+    const importFeedBtn = $("#importFeedBtn");
+    const importFileInput = $("#importFileInput");
+
+    // Modal elements
+    const importHelpModal = $("#importHelpModal");
+    const importHelpModalClose = $("#importHelpModalClose");
+    const importHelpCancelBtn = $("#importHelpCancelBtn");
+    const importHelpUploadBtn = $("#importHelpUploadBtn");
+
+    function bindImportEvents() {
+        if (!importFeedBtn || !importFileInput) return;
+
+        // Open Modal
+        importFeedBtn.addEventListener("click", () => {
+            importHelpModal.classList.add("active");
+        });
+
+        // Close Modal
+        const closeModal = () => importHelpModal.classList.remove("active");
+        if (importHelpModalClose) importHelpModalClose.addEventListener("click", closeModal);
+        if (importHelpCancelBtn) importHelpCancelBtn.addEventListener("click", closeModal);
+
+        // Upload Action
+        if (importHelpUploadBtn) {
+            importHelpUploadBtn.addEventListener("click", () => {
+                closeModal();
+                importFileInput.click();
+            });
+        }
+
+        // Close on background click
+        importHelpModal.addEventListener("click", (e) => {
+            if (e.target === importHelpModal) closeModal();
+        });
+
+        importFileInput.addEventListener("change", async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // Simple validation
+            if (!file.name.endsWith(".csv")) {
+                showToast("Please select a .csv file", "error");
+                importFileInput.value = ""; // Reset
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            // Show loading toast
+            showToast("Importing feeds...", "info");
+
+            try {
+                const res = await fetch("/api/feeds/import", {
+                    method: "POST",
+                    body: formData,
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.error || "Import failed");
+                }
+
+                showToast(`Imported ${data.imported_count} feeds. Errors: ${data.error_count}`, "success");
+
+                // Refresh feeds
+                await loadFeeds();
+                await loadArticles();
+
+            } catch (err) {
+                showToast("Import error: " + err.message, "error");
+            } finally {
+                // Reset input
+                importFileInput.value = "";
+            }
+        });
+    }
+
     // --- Init ---
 
     function init() {
         initTheme();
         bindEvents();
+        bindImportEvents();
         loadFeeds();
         loadArticles();
     }
@@ -727,4 +1014,5 @@
     } else {
         init();
     }
+
 })();

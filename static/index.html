@@ -67,13 +67,23 @@
             <div class="sidebar-section">
                 <div class="sidebar-header">
                     <h2>Feeds</h2>
-                    <button class="btn btn-sm btn-primary" id="addFeedBtn" title="Add feed">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                            <line x1="12" y1="5" x2="12" y2="19"></line>
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                        </svg>
-                        Add Feed
-                    </button>
+                    <div class="sidebar-actions">
+                        <input type="file" id="importFileInput" accept=".csv" style="display: none;">
+                        <button class="btn btn-sm btn-secondary" id="importFeedBtn" title="Import from CSV">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                        </button>
+                        <button class="btn btn-sm btn-primary" id="addFeedBtn" title="Add feed">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            Add
+                        </button>
+                    </div>
                 </div>
                 <div class="feed-list" id="feedList">
                     <div class="feed-list-empty" id="feedListEmpty">
@@ -227,6 +237,31 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="confirmCancelBtn">Cancel</button>
                 <button class="btn btn-danger" id="confirmOkBtn">Remove</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Help Modal -->
+    <div class="modal-overlay" id="importHelpModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Import YouTube Subscriptions</h2>
+                <button class="btn btn-icon modal-close" id="importHelpModalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 1rem;">Follow these steps to export your subscriptions from YouTube:</p>
+                <ol style="margin-left: 1.5rem; line-height: 1.6; margin-bottom: 1.5rem;">
+                    <li>Go to <a href="https://takeout.google.com/" target="_blank" style="color: var(--color-primary);">Google Takeout</a>.</li>
+                    <li>Deselect all, then find and select <strong>YouTube and YouTube Music</strong>.</li>
+                    <li>Click <em>"All YouTube data included"</em> and select only <strong>subscriptions</strong>.</li>
+                    <li>Create the export, download it, and unzip the file.</li>
+                    <li>Locate <strong>subscriptions.csv</strong> in the unzipped folder.</li>
+                </ol>
+                <p>Click below to upload the <code>subscriptions.csv</code> file.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="importHelpCancelBtn">Cancel</button>
+                <button class="btn btn-primary" id="importHelpUploadBtn">Upload CSV</button>
             </div>
         </div>
     </div>

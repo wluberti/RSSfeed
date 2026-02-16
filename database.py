@@ -205,6 +205,7 @@ class Database:
         sort: str = "date",
         order: str = "desc",
         query: Optional[str] = None,
+        group: Optional[str] = None,
     ) -> list[dict]:
         """Get articles with optional filtering and sorting.
 
@@ -213,6 +214,7 @@ class Database:
             sort: Sort field — 'date', 'title', or 'feed'.
             order: Sort order — 'asc' or 'desc'.
             query: Optional search query to filter articles.
+            group: Optional group filter ('youtube').
 
         Returns:
             List of article dicts with feed title included.
@@ -232,24 +234,28 @@ class Database:
             conditions.append("a.feed_id = ?")
             params.append(feed_id)
 
+        if group == "youtube":
+            conditions.append("(f.url LIKE '%youtube.com%' OR f.site_url LIKE '%youtube.com%')")
+
         if query:
             conditions.append("(a.title LIKE ? OR a.description LIKE ? OR a.author LIKE ? OR a.category LIKE ?)")
             q = f"%{query}%"
             params.extend([q, q, q, q])
 
-        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
         conn = self._get_conn()
         try:
-            rows = conn.execute(
-                f"""SELECT a.*, f.title as feed_title, f.image_url as feed_image
+            # Need to join with feeds to filter by group if needed
+            # The join is already there in the original query
+            sql = f"""SELECT a.*, f.title as feed_title, f.image_url as feed_image
                     FROM articles a
                     JOIN feeds f ON a.feed_id = f.id
-                    {where}
+                    {where_clause}
                     ORDER BY {sort_col} {order_dir}
-                    LIMIT 500""",
-                params,
-            ).fetchall()
+                    LIMIT 500"""
+
+            rows = conn.execute(sql, params).fetchall()
             return [dict(r) for r in rows]
         finally:
             conn.close()

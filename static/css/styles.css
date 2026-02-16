@@ -614,7 +614,8 @@ a:hover {
     transition: opacity var(--transition-fast);
 }
 
-.feed-item:hover .feed-item-actions {
+.feed-item:hover .feed-item-actions,
+.feed-group-header:hover .feed-item-actions {
     opacity: 1;
 }
 
