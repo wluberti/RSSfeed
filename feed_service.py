@@ -62,13 +62,26 @@ def _extract_meta(feed_data: feedparser.FeedParserDict, url: str) -> dict:
     if hasattr(feed_data, "image") and feed_data.image:
         image_url = getattr(feed_data.image, "href", "") or getattr(feed_data.image, "url", "")
 
-    return {
+    result = {
         "url": url,
         "title": getattr(feed_data, "title", "") or url,
         "description": getattr(feed_data, "subtitle", "") or getattr(feed_data, "description", ""),
         "site_url": getattr(feed_data, "link", ""),
         "image_url": image_url,
     }
+
+    # Fallback to Google Favicon service if no image found
+    if not result["image_url"]:
+        from urllib.parse import urlparse
+        try:
+            target_url = result["site_url"] or url
+            domain = urlparse(target_url).netloc
+            if domain:
+                result["image_url"] = f"https://www.google.com/s2/favicons?domain={domain}&sz=64"
+        except Exception:
+            pass
+
+    return result
 
 
 def _extract_article(entry: feedparser.FeedParserDict) -> dict:

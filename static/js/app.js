@@ -347,15 +347,18 @@
             card.innerHTML = `
                 <div class="article-card-header">
                     <div class="article-card-feed">
-                        <span class="article-card-feed-dot"></span>
+                        ${article.feed_image ? `<img src="${escapeHtml(article.feed_image)}" class="article-feed-icon" alt="" onerror="this.style.display='none'">` : ""}
+                        <span class="article-card-feed-dot" ${article.feed_image ? 'style="display:none"' : ""}></span>
                         <span>${escapeHtml(article.feed_title || "")}</span>
                     </div>
                     <time class="article-card-date" datetime="${escapeHtml(article.pub_date)}">${dateStr}</time>
                 </div>
-                <h3 class="article-card-title">
-                    <span>${escapeHtml(article.title)}</span>
-                </h3>
-                ${fullDescription ? `<p class="article-card-description">${escapeHtml(fullDescription)}</p>` : ""}
+                <div class="article-content-wrapper">
+                    <h3 class="article-card-title">
+                        <span>${escapeHtml(article.title)}</span>
+                    </h3>
+                    ${fullDescription ? `<p class="article-card-description">${escapeHtml(fullDescription)}</p>` : ""}
+                </div>
                 <div class="article-card-footer">
                     <div class="article-card-meta">
                         ${article.category ? `<span class="article-tag">${escapeHtml(article.category)}</span>` : ""}
