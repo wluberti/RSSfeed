@@ -6,17 +6,18 @@ Manages feeds and articles storage with full CRUD operations.
 import sqlite3
 import os
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List, Dict, Any, Union
 
 
 class Database:
-    """SQLite database manager for feeds and articles.
-
-    Parameters:
-        db_path: Path to the SQLite database file.
-    """
+    """SQLite database manager for feeds and articles."""
 
     def __init__(self, db_path: str = "data/feeds.db") -> None:
+        """Initialize the database manager.
+
+        Args:
+            db_path: Path to the SQLite database file.
+        """
         os.makedirs(os.path.dirname(db_path) if os.path.dirname(db_path) else ".", exist_ok=True)
         self.db_path = db_path
         self._init_db()
@@ -78,11 +79,17 @@ class Database:
         finally:
             conn.close()
 
-    def add_feed(self, url: str, title: str = "", description: str = "",
-                 site_url: str = "", image_url: str = "") -> dict:
+    def add_feed(
+        self,
+        url: str,
+        title: str = "",
+        description: str = "",
+        site_url: str = "",
+        image_url: str = ""
+    ) -> Optional[Dict[str, Any]]:
         """Add a new feed to the database.
 
-        Parameters:
+        Args:
             url: Feed URL.
             title: Feed title.
             description: Feed description.
@@ -90,7 +97,7 @@ class Database:
             image_url: Feed image/logo URL.
 
         Returns:
-            Dict with the newly created feed data.
+            Dict with the newly created feed data, or None on failure.
         """
         conn = self._get_conn()
         try:
@@ -108,7 +115,7 @@ class Database:
     def remove_feed(self, feed_id: int) -> bool:
         """Remove a feed and all its articles.
 
-        Parameters:
+        Args:
             feed_id: ID of the feed to remove.
 
         Returns:
@@ -122,7 +129,7 @@ class Database:
         finally:
             conn.close()
 
-    def get_feeds(self) -> list[dict]:
+    def get_feeds(self) -> List[Dict[str, Any]]:
         """Get all stored feeds.
 
         Returns:
@@ -137,10 +144,10 @@ class Database:
         finally:
             conn.close()
 
-    def get_feed(self, feed_id: int) -> Optional[dict]:
+    def get_feed(self, feed_id: int) -> Optional[Dict[str, Any]]:
         """Get a single feed by ID.
 
-        Parameters:
+        Args:
             feed_id: ID of the feed.
 
         Returns:
@@ -156,10 +163,10 @@ class Database:
         finally:
             conn.close()
 
-    def upsert_articles(self, feed_id: int, articles: list[dict]) -> int:
+    def upsert_articles(self, feed_id: int, articles: List[Dict[str, Any]]) -> int:
         """Insert or update articles for a feed.
 
-        Parameters:
+        Args:
             feed_id: ID of the parent feed.
             articles: List of article dicts with keys: title, link, description,
                       author, category, pub_date, guid, thumbnail.
@@ -214,10 +221,10 @@ class Database:
         order: str = "desc",
         query: Optional[str] = None,
         group: Optional[str] = None,
-    ) -> list[dict]:
+    ) -> List[Dict[str, Any]]:
         """Get articles with optional filtering and sorting.
 
-        Parameters:
+        Args:
             feed_id: Optional feed ID to filter by.
             sort: Sort field — 'date', 'title', or 'feed'.
             order: Sort order — 'asc' or 'desc'.
@@ -236,7 +243,7 @@ class Database:
         order_dir = "ASC" if order.lower() == "asc" else "DESC"
 
         conditions = []
-        params: list = []
+        params: List[Any] = []
 
         if feed_id is not None:
             conditions.append("a.feed_id = ?")

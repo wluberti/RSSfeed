@@ -54,14 +54,30 @@ The application can be configured via environment variables in the `.env` file o
 
 To run locally without Docker:
 
-1.  Install dependencies:
+1.  Create a virtual environment:
     ```bash
-    pip install -r requirements.txt
+    python3 -m venv .venv
+    source .venv/bin/activate
     ```
 
-2.  Run the application:
+2.  Install dependencies:
+    ```bash
+    # Production dependencies
+    pip install -r requirements.txt
+
+    # Development dependencies (linting, testing)
+    pip install -r requirements-dev.txt
+    ```
+
+3.  Run the application:
     ```bash
     python app.py
+    ```
+
+4.  Run verification (linting & tests):
+    ```bash
+    ruff check .
+    pytest
     ```
 
 ## License

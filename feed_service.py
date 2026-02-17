@@ -7,7 +7,7 @@ import feedparser
 import requests
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-from typing import Optional
+from typing import Optional, Dict, List, Any
 
 
 # Timeout for HTTP requests in seconds
@@ -17,10 +17,10 @@ REQUEST_TIMEOUT = 10
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
 
-def fetch_feed(url: str) -> Optional[dict]:
+def fetch_feed(url: str) -> Optional[Dict[str, Any]]:
     """Fetch and parse an RSS/Atom feed from a URL.
 
-    Parameters:
+    Args:
         url: The feed URL to fetch.
 
     Returns:
@@ -64,10 +64,10 @@ def fetch_feed(url: str) -> Optional[dict]:
     return {"meta": meta, "articles": articles}
 
 
-def _extract_meta(feed_data: feedparser.FeedParserDict, url: str) -> dict:
+def _extract_meta(feed_data: feedparser.FeedParserDict, url: str) -> Dict[str, str]:
     """Extract feed metadata from parsed feed.
 
-    Parameters:
+    Args:
         feed_data: Parsed feed metadata from feedparser.
         url: Original feed URL.
 
@@ -100,10 +100,10 @@ def _extract_meta(feed_data: feedparser.FeedParserDict, url: str) -> dict:
     return result
 
 
-def _extract_article(entry: feedparser.FeedParserDict) -> dict:
+def _extract_article(entry: feedparser.FeedParserDict) -> Dict[str, str]:
     """Extract article data from a feed entry.
 
-    Parameters:
+    Args:
         entry: A single feed entry from feedparser.
 
     Returns:
@@ -142,7 +142,7 @@ def _extract_article(entry: feedparser.FeedParserDict) -> dict:
 def _parse_date(date_str: str) -> str:
     """Parse various date formats to ISO 8601.
 
-    Parameters:
+    Args:
         date_str: Date string in RFC 2822 or other common formats.
 
     Returns:
@@ -169,7 +169,7 @@ def _parse_date(date_str: str) -> str:
 def validate_feed_url(url: str) -> bool:
     """Check if a URL points to a valid RSS/Atom feed.
 
-    Parameters:
+    Args:
         url: URL to validate.
 
     Returns:

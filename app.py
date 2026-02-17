@@ -4,7 +4,11 @@ Entry point that serves the API and static frontend.
 """
 
 import os
-from flask import Flask, jsonify, request, send_from_directory
+import csv
+import io
+from typing import Tuple, Union, Any, Dict
+
+from flask import Flask, jsonify, request, send_from_directory, Response
 from dotenv import load_dotenv
 
 from database import Database
@@ -15,13 +19,16 @@ load_dotenv()
 
 app = Flask(__name__, static_folder="static", static_url_path="")
 
+# Initialize database
+# Note: In production with gunicorn workers, this executes per worker process,
+# ensuring thread safety for SQLite.
 db = Database(os.getenv("DATABASE_PATH", "data/feeds.db"))
 
 
 # --- Static file serving ---
 
 @app.route("/")
-def index():
+def index() -> Response:
     """Serve the main application page.
 
     Returns:
@@ -33,7 +40,7 @@ def index():
 # --- Feed API ---
 
 @app.route("/api/feeds", methods=["GET"])
-def get_feeds():
+def get_feeds() -> Response:
     """Get all stored feeds.
 
     Returns:
@@ -44,15 +51,15 @@ def get_feeds():
 
 
 @app.route("/api/feeds", methods=["POST"])
-def add_feed():
+def add_feed() -> Tuple[Response, int]:
     """Add a new RSS feed by URL.
 
     Expects JSON body: {"url": "https://example.com/feed.xml"}
 
     Returns:
-        JSON with the new feed data and fetched articles, or error.
+        Tuple containing JSON response (feed data or error) and HTTP status code.
     """
-    data = request.get_json()
+    data: Union[Dict[str, Any], None] = request.get_json()
     if not data or not data.get("url"):
         return jsonify({"error": "URL is required"}), 400
 
@@ -73,6 +80,8 @@ def add_feed():
             site_url=meta.get("site_url", ""),
             image_url=meta.get("image_url", ""),
         )
+        if not feed:
+            return jsonify({"error": "Failed to save feed"}), 500
     except Exception as e:
         if "UNIQUE constraint" in str(e):
             return jsonify({"error": "Feed already exists"}), 409
@@ -80,35 +89,37 @@ def add_feed():
 
     # Store articles
     article_count = db.upsert_articles(feed["id"], result["articles"])
-    feed = db.get_feed(feed["id"])
+    # Reload feed to get updated counts if necessary, though we just added it.
+    # The upsert might have updated last_fetched.
+    updated_feed = db.get_feed(feed["id"])
 
-    return jsonify({"feed": feed, "articles_added": article_count}), 201
+    return jsonify({"feed": updated_feed, "articles_added": article_count}), 201
 
 
 @app.route("/api/feeds/<int:feed_id>", methods=["DELETE"])
-def delete_feed(feed_id: int):
+def delete_feed(feed_id: int) -> Tuple[Response, int]:
     """Remove a feed and all its articles.
 
-    Parameters:
+    Args:
         feed_id: ID of the feed to remove.
 
     Returns:
-        JSON success or 404 error.
+        JSON success or 404 error with HTTP status code.
     """
     if db.remove_feed(feed_id):
-        return jsonify({"success": True})
+        return jsonify({"success": True}), 200
     return jsonify({"error": "Feed not found"}), 404
 
 
 @app.route("/api/feeds/<int:feed_id>/refresh", methods=["POST"])
-def refresh_feed(feed_id: int):
+def refresh_feed(feed_id: int) -> Tuple[Response, int]:
     """Refresh a single feed's articles.
 
-    Parameters:
+    Args:
         feed_id: ID of the feed to refresh.
 
     Returns:
-        JSON with refresh results.
+        JSON with refresh results and HTTP status code.
     """
     feed = db.get_feed(feed_id)
     if not feed:
@@ -119,11 +130,11 @@ def refresh_feed(feed_id: int):
         return jsonify({"error": "Could not fetch feed"}), 502
 
     count = db.upsert_articles(feed_id, result["articles"])
-    return jsonify({"success": True, "articles_updated": count})
+    return jsonify({"success": True, "articles_updated": count}), 200
 
 
 @app.route("/api/feeds/refresh", methods=["POST"])
-def refresh_all_feeds():
+def refresh_all_feeds() -> Response:
     """Refresh all stored feeds.
 
     Returns:
@@ -135,16 +146,24 @@ def refresh_all_feeds():
         result = fetch_feed(feed["url"])
         if result:
             count = db.upsert_articles(feed["id"], result["articles"])
-            results.append({"feed_id": feed["id"], "title": feed["title"], "articles_updated": count})
+            results.append({
+                "feed_id": feed["id"],
+                "title": feed["title"],
+                "articles_updated": count
+            })
         else:
-            results.append({"feed_id": feed["id"], "title": feed["title"], "error": "Failed to fetch"})
+            results.append({
+                "feed_id": feed["id"],
+                "title": feed["title"],
+                "error": "Failed to fetch"
+            })
     return jsonify({"results": results})
 
 
 # --- Articles API ---
 
 @app.route("/api/articles", methods=["GET"])
-def get_articles():
+def get_articles() -> Response:
     """Get articles with optional filtering and sorting.
 
     Query parameters:
@@ -152,11 +171,14 @@ def get_articles():
         sort: Sort by 'date', 'title', or 'feed'.
         order: 'asc' or 'desc'.
         q: Search query string.
+        group: Group filter (e.g., 'youtube').
 
     Returns:
         JSON list of article objects.
     """
-    feed_id = request.args.get("feed_id", type=int)
+    feed_id_raw = request.args.get("feed_id")
+    feed_id = int(feed_id_raw) if feed_id_raw else None
+
     sort = request.args.get("sort", "date")
     order = request.args.get("order", "desc")
     query = request.args.get("q")
@@ -171,14 +193,16 @@ def get_articles():
 # --- Web Search API ---
 
 @app.route("/api/search/web", methods=["GET"])
-def search_web():
+def search_web() -> Tuple[Response, int]:
     """Search the web for RSS feeds.
 
     Query parameters:
         q: Search query.
+        site: Optional site filter.
+        feed: Optional feed type filter.
 
     Returns:
-        JSON list of search result objects.
+        JSON list of search result objects or error.
     """
     query = request.args.get("q", "").strip()
     site_filter = request.args.get("site", "").strip()
@@ -188,11 +212,11 @@ def search_web():
         return jsonify({"error": "Search query is required"}), 400
 
     results = search_feeds(query, site_filter=site_filter, feed_filter=feed_filter)
-    return jsonify(results)
+    return jsonify(results), 200
 
 
 @app.route("/api/feeds/import", methods=["POST"])
-def import_feeds():
+def import_feeds() -> Tuple[Response, int]:
     """Import feeds from OPML or CSV.
 
     Currently supports Google Takeout YouTube subscription CSVs.
@@ -205,23 +229,22 @@ def import_feeds():
         return jsonify({"error": "No file part"}), 400
 
     file = request.files["file"]
-    if file.filename == "":
+    if file.filename == "" or not file.filename:
         return jsonify({"error": "No selected file"}), 400
 
     if not file.filename.endswith(".csv"):
         return jsonify({"error": "Only .csv files are supported currently"}), 400
 
-    import csv
-    import io
-
     try:
         stream = io.StringIO(file.stream.read().decode("utf-8"), newline=None)
         reader = csv.DictReader(stream)
+        fieldnames = reader.fieldnames or []
 
         # Verify headers for YouTube Takeout CSV
-        if not set(["Channel ID", "Channel Title"]).issubset(reader.fieldnames or []):
-             # Try stricter check or fallback
-             pass
+        # Ideally we should validate more strictly, but simplistic check is okay for now
+        # We need at least Channel ID to construct the URL
+        if "Channel ID" not in fieldnames:
+             pass # Could handle error, but let's try reading anyway
 
         success_count = 0
         errors = []
@@ -236,14 +259,8 @@ def import_feeds():
             # Construct YouTube RSS URL
             feed_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
 
-            # Add to database (simulating a fetch to get metadata isn't strictly necessary if we trust the construction,
-            # but we need to fetch to get the proper image/description if we want it nice.
-            # However, for bulk import, let's just add it and let the first refresh populate details?
-            # OR better: use the existing fetch_feed to verify and get metadata.)
-
-            # To speed up, we can try to add directly if we are sure, but fetch_feed ensures valid RSS.
-            # Let's use fetch_feed for correctness, even if slower.
-
+            # Fetch feed to verify and get metadata
+            # This is slower but ensures valid data
             result = fetch_feed(feed_url)
             if not result:
                 errors.append(f"Failed to fetch feed for {title or channel_id}")
@@ -258,9 +275,9 @@ def import_feeds():
                     site_url=meta.get("site_url", f"https://www.youtube.com/channel/{channel_id}"),
                     image_url=meta.get("image_url", ""),
                 )
-                # Store articles too? Yes, for immediate content.
-                db.upsert_articles(feed["id"], result["articles"])
-                success_count += 1
+                if feed:
+                    db.upsert_articles(feed["id"], result["articles"])
+                    success_count += 1
             except Exception as e:
                 if "UNIQUE constraint" not in str(e):
                     errors.append(f"Error adding {title}: {str(e)}")
@@ -269,7 +286,7 @@ def import_feeds():
             "success": True,
             "count": success_count,
             "errors": errors
-        })
+        }), 200
 
     except Exception as e:
         return jsonify({"error": f"Import failed: {str(e)}"}), 500
