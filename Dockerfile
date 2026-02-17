@@ -9,8 +9,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create a non-root user
-RUN addgroup --system appgroup && adduser --system --group appuser
+# Create a non-root user with a fixed UID (1000) to match host user
+ARG UID=1000
+ARG GID=1000
+RUN groupadd -g "${GID}" appgroup && \
+    useradd -m -u "${UID}" -g "${GID}" -s /bin/bash appuser
 
 # Create data directory and set permissions
 RUN mkdir -p data && chown -R appuser:appgroup /app

@@ -80,6 +80,19 @@ To run locally without Docker:
     pytest
     ```
 
+## Troubleshooting
+
+### Database Read-Only Error
+If you encounter `sqlite3.OperationalError: attempt to write a readonly database` on Linux, it means the Docker container user cannot write to the `./data` directory.
+
+The container runs as a non-root user (UID 1000). Ensure your host `data` directory is owned by UID 1000 or is writable:
+
+```bash
+sudo chown -R 1000:1000 data
+# OR
+sudo chmod -R 777 data
+```
+
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
