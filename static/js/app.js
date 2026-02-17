@@ -567,11 +567,15 @@
                         </svg>
                     </a>` : ""}
                 </div>
+                ${article.thumbnail ? `<img src="${escapeHtml(article.thumbnail)}" class="article-card-thumbnail" alt="" onerror="this.style.display='none'" loading="lazy">` : ""}
                 <div class="article-content-wrapper">
-                    <h3 class="article-card-title">
-                        ${article.feed_image ? `<img src="${escapeHtml(article.feed_image)}" class="article-title-icon" alt="" onerror="this.style.display='none'">` : ""}
-                        <span>${escapeHtml(article.title)}</span>
-                    </h3>
+                    <div class="article-card-title-row">
+                        <h3 class="article-card-title">
+                            ${article.feed_image ? `<img src="${escapeHtml(article.feed_image)}" class="article-title-icon" alt="" onerror="this.style.display='none'">` : ""}
+                            <span>${escapeHtml(article.title)}</span>
+                        </h3>
+                        <time class="article-card-date-inline" datetime="${escapeHtml(article.pub_date)}">${dateStr}</time>
+                    </div>
                     ${fullDescription ? `<p class="article-card-description">${escapeHtml(fullDescription)}</p>` : ""}
                 </div>
                 <div class="article-card-footer">

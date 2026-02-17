@@ -784,10 +784,10 @@ a:hover {
 }
 
 .articles-container.layout-list .article-card {
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--space-1);
-    padding: var(--space-3);
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
     border-radius: 0;
     border-left: none;
     border-right: none;
@@ -815,10 +815,9 @@ a:hover {
     display: none;
 }
 
+/* Hide the header-level date in list view (shown inline with title instead) */
 .articles-container.layout-list .article-card-date {
-    font-size: var(--font-size-xs);
-    color: var(--color-text-tertiary);
-    flex-shrink: 0;
+    display: none;
 }
 
 /* Show the read-article link in the header (pulled from footer) */
@@ -826,14 +825,55 @@ a:hover {
     display: inline-flex;
 }
 
-/* Content: title always visible, description clamped or full */
+/* --- Thumbnail --- */
+.article-card-thumbnail {
+    display: none;
+}
+
+.articles-container.layout-list .article-card-thumbnail {
+    display: block;
+    width: 120px;
+    min-width: 120px;
+    height: 68px;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+    align-self: flex-start;
+}
+
+/* Content wrapper: fill remaining space */
 .articles-container.layout-list .article-content-wrapper {
-    width: 100%;
-    max-width: 100%;
+    flex: 1;
     min-width: 0;
     overflow: hidden;
     word-break: break-word;
     overflow-wrap: break-word;
+}
+
+/* Title row: title + inline date on same line */
+.article-card-title-row {
+    display: contents;
+}
+
+.articles-container.layout-list .article-card-title-row {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    width: 100%;
+}
+
+/* Inline date: hidden in tile view, shown in list view */
+.article-card-date-inline {
+    display: none;
+}
+
+.articles-container.layout-list .article-card-date-inline {
+    display: block;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-tertiary);
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-left: auto;
 }
 
 /* Title row: icon + title side by side */
@@ -847,6 +887,8 @@ a:hover {
     line-height: 1.4;
     word-wrap: break-word;
     overflow-wrap: break-word;
+    min-width: 0;
+    flex: 1;
 }
 
 /* Show feed icon before title text */

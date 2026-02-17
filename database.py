@@ -59,6 +59,7 @@ class Database:
                     category TEXT NOT NULL DEFAULT '',
                     pub_date TEXT NOT NULL DEFAULT '',
                     guid TEXT NOT NULL DEFAULT '',
+                    thumbnail TEXT NOT NULL DEFAULT '',
                     read INTEGER NOT NULL DEFAULT 0,
                     FOREIGN KEY (feed_id) REFERENCES feeds(id) ON DELETE CASCADE,
                     UNIQUE(feed_id, guid)
@@ -68,6 +69,11 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_articles_pub_date ON articles(pub_date);
                 CREATE INDEX IF NOT EXISTS idx_articles_guid ON articles(guid);
             """)
+            # Migration: add thumbnail column to existing databases
+            try:
+                conn.execute("ALTER TABLE articles ADD COLUMN thumbnail TEXT NOT NULL DEFAULT ''")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
             conn.commit()
         finally:
             conn.close()
@@ -156,7 +162,7 @@ class Database:
         Parameters:
             feed_id: ID of the parent feed.
             articles: List of article dicts with keys: title, link, description,
-                      author, category, pub_date, guid.
+                      author, category, pub_date, guid, thumbnail.
 
         Returns:
             Number of articles inserted/updated.
@@ -169,15 +175,16 @@ class Database:
                 try:
                     conn.execute(
                         """INSERT INTO articles
-                           (feed_id, title, link, description, author, category, pub_date, guid)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                           (feed_id, title, link, description, author, category, pub_date, guid, thumbnail)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                            ON CONFLICT(feed_id, guid) DO UPDATE SET
                              title=excluded.title,
                              link=excluded.link,
                              description=excluded.description,
                              author=excluded.author,
                              category=excluded.category,
-                             pub_date=excluded.pub_date""",
+                             pub_date=excluded.pub_date,
+                             thumbnail=excluded.thumbnail""",
                         (
                             feed_id,
                             article.get("title", ""),
@@ -187,6 +194,7 @@ class Database:
                             article.get("category", ""),
                             article.get("pub_date", ""),
                             guid,
+                            article.get("thumbnail", ""),
                         ),
                     )
                     count += 1

@@ -11,10 +11,10 @@ from typing import Optional
 
 
 # Timeout for HTTP requests in seconds
-REQUEST_TIMEOUT = 15
+REQUEST_TIMEOUT = 10
 
 # User agent for feed fetching
-USER_AGENT = "RSSFeedReader/1.0 (+https://github.com/rssfeedreader)"
+USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
 
 def fetch_feed(url: str) -> Optional[dict]:
@@ -35,7 +35,23 @@ def fetch_feed(url: str) -> Optional[dict]:
         )
         response.raise_for_status()
     except requests.RequestException:
-        return None
+        # YouTube Fallback: channel_id (UC...) -> playlist_id (UU...)
+        if "youtube.com/feeds/videos.xml" in url and "channel_id=UC" in url:
+            try:
+                # Replace channel_id=UC... with playlist_id=UU...
+                fallback_url = url.replace("channel_id=UC", "playlist_id=UU")
+                response = requests.get(
+                    fallback_url,
+                    timeout=REQUEST_TIMEOUT,
+                    headers={"User-Agent": USER_AGENT},
+                )
+                response.raise_for_status()
+                # If successful, parse this response instead
+            except requests.RequestException:
+                # If fallback also fails, return None (original failure)
+                return None
+        else:
+            return None
 
     feed = feedparser.parse(response.content)
 
@@ -107,6 +123,10 @@ def _extract_article(entry: feedparser.FeedParserDict) -> dict:
     if hasattr(entry, "content") and entry.content:
         description = entry.content[0].get("value", description)
 
+    thumbnail = ""
+    if hasattr(entry, "media_thumbnail") and entry.media_thumbnail:
+        thumbnail = entry.media_thumbnail[0].get("url", "")
+
     return {
         "title": getattr(entry, "title", ""),
         "link": getattr(entry, "link", ""),
@@ -115,6 +135,7 @@ def _extract_article(entry: feedparser.FeedParserDict) -> dict:
         "category": category,
         "pub_date": pub_date,
         "guid": getattr(entry, "id", "") or getattr(entry, "link", ""),
+        "thumbnail": thumbnail,
     }
 
 
