@@ -801,28 +801,66 @@ a:hover {
     box-shadow: none;
 }
 
-/* Header: date + read-article link in a right-aligned row */
-.articles-container.layout-list .article-card-header {
+/* Header: feed info + meta (date/link) */
+.article-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-2);
+}
+
+.article-card-header-meta {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
     gap: var(--space-3);
+    margin-left: auto;
+    /* Push to right */
+}
+
+.article-card-date {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-tertiary);
+    white-space: nowrap;
+}
+
+.article-card-link.header-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--font-size-xs);
+    color: var(--color-primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.article-card-link.header-link:hover {
+    text-decoration: underline;
+}
+
+.article-card-link.header-link svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* List layout overrides */
+.articles-container.layout-list .article-card-header {
+    justify-content: flex-end;
     margin-bottom: 0;
 }
 
-/* Hide feed info from header (icon moves to title row) */
-.articles-container.layout-list .article-card-feed {
-    display: none;
-}
-
-/* Hide the header-level date in list view (shown inline with title instead) */
+/* Hide header date in list view (uses inline date) */
 .articles-container.layout-list .article-card-date {
     display: none;
 }
 
-/* Show the read-article link in the header (pulled from footer) */
-.articles-container.layout-list .article-card-header .article-card-link {
-    display: inline-flex;
+/* Tile Layout Specifics */
+.articles-container:not(.layout-list) .article-card {
+    padding-bottom: var(--space-2);
+    /* Reduced from default */
+}
+
+.articles-container:not(.layout-list) .article-card-footer {
+    margin-top: var(--space-2);
 }
 
 /* --- Thumbnail --- */
@@ -1009,6 +1047,11 @@ a:hover {
     flex-shrink: 0;
 }
 
+/* List view: hide entire feed info in header (icon is in title) */
+.articles-container.layout-list .article-card-feed {
+    display: none;
+}
+
 .article-card-date {
     font-size: var(--font-size-xs);
     color: var(--color-text-tertiary);
@@ -1101,13 +1144,20 @@ a:hover {
     white-space: nowrap;
 }
 
-/* Hide header-link and title-icon by default (tile view) */
-.article-card-link.header-link {
+/* Hide title-icon and title-row-link by default (tile view) */
+.article-title-icon,
+.article-card-link.title-row-link {
     display: none;
 }
 
-.article-title-icon {
+/* List View Overrides */
+.articles-container.layout-list .article-card-link.header-link {
     display: none;
+}
+
+.articles-container.layout-list .article-card-link.title-row-link {
+    display: inline-flex;
+    margin-left: var(--space-2);
 }
 
 .article-card-link:hover {

@@ -557,15 +557,17 @@
                         <span class="article-card-feed-dot" ${article.feed_image ? 'style="display:none"' : ""}></span>
                         <span>${escapeHtml(article.feed_title || "")}</span>
                     </div>
-                    <time class="article-card-date" datetime="${escapeHtml(article.pub_date)}">${dateStr}</time>
-                    ${article.link ? `<a class="article-card-link header-link" href="${escapeHtml(article.link)}" target="_blank" rel="noopener noreferrer">
-                        Read article
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                            <polyline points="15 3 21 3 21 9"></polyline>
-                            <line x1="10" y1="14" x2="21" y2="3"></line>
-                        </svg>
-                    </a>` : ""}
+                    <div class="article-card-header-meta">
+                        <time class="article-card-date" datetime="${escapeHtml(article.pub_date)}">${dateStr}</time>
+                        ${article.link ? `<a class="article-card-link header-link" href="${escapeHtml(article.link)}" target="_blank" rel="noopener noreferrer">
+                            Read article
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                <polyline points="15 3 21 3 21 9"></polyline>
+                                <line x1="10" y1="14" x2="21" y2="3"></line>
+                            </svg>
+                        </a>` : ""}
+                    </div>
                 </div>
                 ${article.thumbnail ? `<img src="${escapeHtml(article.thumbnail)}" class="article-card-thumbnail" alt="" onerror="this.style.display='none'" loading="lazy">` : ""}
                 <div class="article-content-wrapper">
@@ -575,6 +577,14 @@
                             <span>${escapeHtml(article.title)}</span>
                         </h3>
                         <time class="article-card-date-inline" datetime="${escapeHtml(article.pub_date)}">${dateStr}</time>
+                        ${article.link ? `<a class="article-card-link title-row-link" href="${escapeHtml(article.link)}" target="_blank" rel="noopener noreferrer">
+                            Read article
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                <polyline points="15 3 21 3 21 9"></polyline>
+                                <line x1="10" y1="14" x2="21" y2="3"></line>
+                            </svg>
+                        </a>` : ""}
                     </div>
                     ${fullDescription ? `<p class="article-card-description">${escapeHtml(fullDescription)}</p>` : ""}
                 </div>
@@ -583,14 +593,6 @@
                         ${article.category ? `<span class="article-tag">${escapeHtml(article.category)}</span>` : ""}
                         ${article.author ? `<span class="article-author">by ${escapeHtml(article.author)}</span>` : ""}
                     </div>
-                    ${article.link ? `<a class="article-card-link footer-link" href="${escapeHtml(article.link)}" target="_blank" rel="noopener noreferrer">
-                        Read article
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                            <polyline points="15 3 21 3 21 9"></polyline>
-                            <line x1="10" y1="14" x2="21" y2="3"></line>
-                        </svg>
-                    </a>` : ""}
                 </div>
                 <div class="article-card-view-hint">Click to expand</div>
             `;

@@ -4,10 +4,8 @@ services:
     ports:
       - "${FLASK_PORT:-5050}:5050"
     volumes:
-      - feed_data:/app/data
+      - .:/app
+      - ./data:/app/data
     env_file:
       - .env
     restart: unless-stopped
-
-volumes:
-  feed_data:
